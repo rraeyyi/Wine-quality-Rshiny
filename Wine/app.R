@@ -1,6 +1,7 @@
 library(shiny)
 library(shinydashboard)
 library(dplyr)
+library(tidyr)
 library(ggplot2)
 library(stringr)
 library(caret)
@@ -37,14 +38,18 @@ ui <- dashboardPage(
       tabItem(tabName = "exploration",
               h4("Select Variable:"),
               selectizeInput("variables", "Variables", 
-                             choice = c("Fixed Acidity", "Volatile Acidity", "Citric Acid", "Residual Sugar", "Chlorides", "Free Sulfur Dioxide", "Total Sulfur Dioxide", "Density", "pH", "Sulphates", "Alcohol")), br(), 
-              h4("Create Numeric Summary:"),
-              checkboxInput("summary", "Numeric Summary"),
-              tableOutput("summary"),
-              h4("Select Plot Type:"),
-              radioButtons("plot", label = "Plot Type", 
-                           choices = c("Bar plot", "Box plot")),
-              plotOutput("plot")
+                             choice = c("Fixed Acidity", "Volatile Acidity", "Citric Acid", "Residual Sugar", "Chlorides", "Free Sulfur Dioxide", "Total Sulfur Dioxide", "Density", "pH", "Sulphates", "Alcohol")), 
+              h4("Rate Classification:"),
+              checkboxInput("rate", "Rate"),
+              h4("Select Summary Type:"),
+              radioButtons("summary", label = "",
+                           choices=c("Numeric Summaries", "Graphical Summaries")),
+              conditionalPanel(condition = "input.summary == 'Graphical Summaries'",
+                               radioButtons("plot", label = "Select plot type",
+                                            choices = c("Bar plot", "Box plot")),
+                               mainPanel(plotOutput("plot"))),
+              conditionalPanel(condition = "input.summary == 'Numeric Summaries'",
+                               mainPanel(tableOutput("tab")))
       ),
               
       # Modeling tab content
@@ -118,22 +123,21 @@ server <- function(input, output, session) {
   })
 
   # Create numeric summary
-  output$summary <- renderTable({
+  output$tab <- renderTable({
     wine <- getData() 
+    
     if (str_length(input$variables) <= 10){
       var <- input$variables
     } else {
       var <- gsub(" ", "", input$variables)
     }
-    subwine <- wine %>% select(var)
     
+    subwine <- wine %>% select(var)
     observe({updateSelectizeInput(session, "summary")})
     
-    if(input$summary)
-      sum <- subwine %>% summary() %>% as.data.frame()
-      sum %>% separate(Freq, c("Stat", "Value"), sep=":") %>% pivot_wider(names_from =Stat, values_from = Value) %>% select(-Var1, Variable = Var2)
-    
-  })
+    sum <- subwine %>% summary() %>% as.data.frame()
+    sum %>% separate(Freq, c("Stat", "Value"), sep=":") %>% pivot_wider(names_from =Stat, values_from = Value) %>% select(-Var1, Variable = Var2)
+  }) 
   
   # Create plot
   output$plot <- renderPlot({
@@ -146,7 +150,6 @@ server <- function(input, output, session) {
       var <- gsub(" ", "", input$variables)
     }
     g <- ggplot(wine, aes(x = get(var)))
-    
     observe({updateSelectizeInput(session, "plot")})
     
     # Plot based on selection
@@ -158,7 +161,7 @@ server <- function(input, output, session) {
         labs(x = input$variables)
     }
   })
-  
+
   # Create fit formula
   fit <- reactive({
     as.formula(paste0("Quality ~ ", paste(input$predictors, collapse = "+")))
