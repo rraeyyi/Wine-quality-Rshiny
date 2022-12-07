@@ -35,10 +35,13 @@ ui <- dashboardPage(
       
       # Data Exploration tab content
       tabItem(tabName = "exploration",
-              h4("Select the Variables:"),
+              h4("Select Variable:"),
               selectizeInput("variables", "Variables", 
                              choice = c("Fixed Acidity", "Volatile Acidity", "Citric Acid", "Residual Sugar", "Chlorides", "Free Sulfur Dioxide", "Total Sulfur Dioxide", "Density", "pH", "Sulphates", "Alcohol")), br(), 
-              h4("Select the Plot Type:"),
+              h4("Create Numeric Summary:"),
+              checkboxInput("summary", "Numeric Summary"),
+              tableOutput("summary"),
+              h4("Select Plot Type:"),
               radioButtons("plot", label = "Plot Type", 
                            choices = c("Bar plot", "Box plot")),
               plotOutput("plot")
@@ -86,6 +89,12 @@ ui <- dashboardPage(
 
 
 server <- function(input, output, session) {
+  
+  # Output image
+  output$img <- renderUI({
+    tags$img(src = "https://cdn.analyticsvidhya.com/wp-content/uploads/2021/04/45245download.jpg")
+  })
+  
   # Read in data
   getData <- reactive({
     if (input$type == "Red"){
@@ -108,6 +117,48 @@ server <- function(input, output, session) {
     return(wine)
   })
 
+  # Create numeric summary
+  output$summary <- renderTable({
+    wine <- getData() 
+    if (str_length(input$variables) <= 10){
+      var <- input$variables
+    } else {
+      var <- gsub(" ", "", input$variables)
+    }
+    subwine <- wine %>% select(var)
+    
+    observe({updateSelectizeInput(session, "summary")})
+    
+    if(input$summary)
+      sum <- subwine %>% summary() %>% as.data.frame()
+      sum %>% separate(Freq, c("Stat", "Value"), sep=":") %>% pivot_wider(names_from =Stat, values_from = Value) %>% select(-Var1, Variable = Var2)
+    
+  })
+  
+  # Create plot
+  output$plot <- renderPlot({
+    wine <- getData() 
+    
+    # Select variable
+    if (str_length(input$variables) <= 10){
+      var <- input$variables
+    } else {
+      var <- gsub(" ", "", input$variables)
+    }
+    g <- ggplot(wine, aes(x = get(var)))
+    
+    observe({updateSelectizeInput(session, "plot")})
+    
+    # Plot based on selection
+    if (input$plot == "Bar plot"){
+      g + geom_bar(aes(fill = as.factor(Quality))) + scale_fill_discrete(name = "Quality") + 
+        labs(x = input$variables)
+    } else {
+      g + geom_boxplot(aes(fill = as.factor(Quality))) + scale_fill_discrete(name = "Quality") + 
+        labs(x = input$variables)
+    }
+  })
+  
   # Create fit formula
   fit <- reactive({
     as.formula(paste0("Quality ~ ", paste(input$predictors, collapse = "+")))
@@ -167,36 +218,7 @@ server <- function(input, output, session) {
     }
   })
   
-  # Output image
-  output$img <- renderUI({
-    tags$img(src = "https://cdn.analyticsvidhya.com/wp-content/uploads/2021/04/45245download.jpg")
-  })
-  
-  # Create plot
-  output$plot <- renderPlot({
-    wine <- getData() 
-    
-    # Select variable
-    if (str_length(input$variables) <= 10){
-      var <- input$variables
-    } else {
-      var <- gsub(" ", "", input$variables)
-    }
-    g <- ggplot(wine, aes(x = get(var)))
-    
-    observe({updateSelectizeInput(session, "plot")})
-    
-    # Plot based on selection
-    if (input$plot == "Bar plot"){
-      g + geom_bar(aes(fill = as.factor(Quality))) + scale_fill_discrete(name = "Quality") + 
-        labs(x = input$variables)
-      } else {
-        g + geom_boxplot(aes(fill = as.factor(Quality))) + scale_fill_discrete(name = "Quality") + 
-          labs(x = input$variables)
-      }
-  })
-  
-  
+
   # Show choices
   output$choices <- renderTable({
     choices <- data.frame(FixedAcidity = input$FixedAcidity,
