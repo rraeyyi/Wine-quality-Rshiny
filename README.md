@@ -1,9 +1,21 @@
 # Final-Project
 
-• Brief description of the app and its purpose.
++ Description   
 
-• A list of packages needed to run the app.
+The purpose of this app is to visualize the data, fit models and eventually predict wine quality by selecting various of factors.   
+The data is from UCI machine learning repository, which includes two datasets related to red and white from vinho verde wine samples, from the north of Portugal. 
 
-• A line of code that would install all the packages used
+Download or learn more about the original data through: [Wine Quality Datasets](https://archive.ics.uci.edu/ml/machine-learning-databases/wine-quality/)
 
-• The shiny::runGitHub() 
++ A list of packages  
+
+library(shiny)  
+library(shinydashboard)  
+library(dplyr)  
+library(ggplot2)  
+library(stringr)  
+library(DT)
+
++ A line of code that would install all the packages used
+
++ The shiny::runGitHub() 
