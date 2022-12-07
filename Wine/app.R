@@ -3,6 +3,7 @@ library(shinydashboard)
 library(dplyr)
 library(ggplot2)
 library(stringr)
+library(caret)
 library(DT)
 
 ui <- dashboardPage(
@@ -47,7 +48,14 @@ ui <- dashboardPage(
       tabItem(tabName = "modeling",
               tabsetPanel(type = "tabs",
                           tabPanel("Modeling Info"),
-                          tabPanel("Modeling Fitting"),
+                          tabPanel("Modeling Fitting", 
+                                   h4("Select the Predictors:"),
+                                   selectInput("predictors","Predictors",
+                                               choice = c("FixedAcidity", "VolatileAcidity", "CitricAcid", "ResidualSugar", "Chlorides", "FreeSulfurDioxide", "TotalSulfurDioxide", "Density", "pH", "Sulphates", "Alcohol"), multiple = TRUE),
+                                   h4("Select Number of Cross Validation:"),
+                                   sliderInput("number", "Cross Validation", min = 0, max = 10, value = 5, step =1),
+                                   mainPanel(tableOutput("model"))
+                                   ),
                           tabPanel("Prediction", h4("Select the Parameters for Variables:"),
                                    sliderInput("FixedAcidity", "Fixed Acidity", min = 0, max = 20, value = 0.7, step = 0.1),
                                    sliderInput("VolatileAcidity", "Volatile Acidity", min = 0, max = 2, value = 0.7, step = 0.1),
@@ -61,7 +69,7 @@ ui <- dashboardPage(
                                    sliderInput("Sulphates", "Sulphates" ,min = 0, max = 2, value = 1, step = 0.1),
                                    sliderInput("Alcohol", "Alcohol", min = 0, max = 15, value = 12, step = 0.1), br(),
                                    h4('Your Choices:'),
-                                   tableOutput('choices'),
+                                   tableOutput("choices")
                                    )
                           )
               ),
@@ -73,8 +81,8 @@ ui <- dashboardPage(
             mainPanel(dataTableOutput("table"))
             )
     )
+    )
   )
-)
 
 
 server <- function(input, output, session) {
@@ -99,10 +107,64 @@ server <- function(input, output, session) {
                             "Quality" = "quality")
     return(wine)
   })
+
+  # Create fit formula
+  fit <- reactive({
+    as.formula(paste0("Quality ~ ", paste(input$predictors, collapse = "+")))
+  })
+
+  # Split data
+  splitData <- reactive({
+    set.seed(216)
+    wine <- getData()
+    intrain <- createDataPartition(wine$Quality, p = 0.7, list = FALSE)
+    intrain <- splitData()
+    training <- wine[intrain,]
+    testing <- wine[-intrain,]
+    
+    # Set up cross validation
+    control <- trainControl(method = "cv", number = 5)
+    
+    # Fit LASSO model
+    lasso_model <- train(fit(),
+                         data = training,
+                         method = "lasso",
+                         preProcess = c("center", "scale"),
+                         trControl = control)
+    lasso_predict <- predict(lasso_model, newdata = testing)
+    lasso_perform <- postResample(lasso_predict, obs = testing$Quality)
+    
+    # Fit random forest model
+    rf_model <- train(fit(), 
+                      data = training, 
+                      method = "rf", 
+                      trControl = control, 
+                      preProcess = c("center", "scale"), 
+                      tuneGrid = expand.grid(mtry = 1:((ncol(training) - 1)/3)))
+    rf_predict <- predict(rf_model, newdata = testing)
+    rf_perform <- postResample(rf_predict, obs = testing$Quality)
+    
+    # Fit boosted tree model  
+    gbm_model <- train(fit(),
+                       data = training,
+                       method = "gbm",
+                       trControl = control,
+                       preProcess = c("center", "scale"),
+                       verbose = FALSE)
+    gbm_predict <- predict(gbm_model, newdata = testing)
+    gbm_perform <- postResample(gbm_predict, obs = testing$Quality)
   
-  # Output table    
-  output$table <- renderDataTable({
-    datatable(getData())
+  })
+
+  output$model <- renderTable({
+    if(!is.null(input$predictors)){
+      table <- as_tibble(rbind(lasso_perform, rf_perform, gbm_perform))
+      Model <- c("Lasso", "Random Forest", "Boosted Tree")
+      performance <- cbind(Model, table)
+      performance
+    } else {
+      print("Please select predictors!")
+    }
   })
   
   # Output image
@@ -134,6 +196,7 @@ server <- function(input, output, session) {
       }
   })
   
+  
   # Show choices
   output$choices <- renderTable({
     choices <- data.frame(FixedAcidity = input$FixedAcidity,
@@ -149,6 +212,11 @@ server <- function(input, output, session) {
                           Alcohol =input$Alcohol
                           )
     choices
+  })
+  
+  # Output table    
+  output$table <- renderDataTable({
+    datatable(getData())
   })
 }
 
