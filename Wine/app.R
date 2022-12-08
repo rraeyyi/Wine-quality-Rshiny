@@ -125,19 +125,22 @@ server <- function(input, output, session) {
   # Create numeric summary
   output$tab <- renderTable({
     wine <- getData() 
-    
     if (str_length(input$variables) <= 10){
       var <- input$variables
     } else {
       var <- gsub(" ", "", input$variables)
     }
     
-    subwine <- wine %>% select(var)
-    observe({updateSelectizeInput(session, "summary")})
-    
-    sum <- subwine %>% summary() %>% as.data.frame()
-    sum %>% separate(Freq, c("Stat", "Value"), sep=":") %>% pivot_wider(names_from =Stat, values_from = Value) %>% select(-Var1, Variable = Var2)
-  }) 
+    if (input$rate){
+      wine %>% mutate(Rate = case_when(Quality <= 4 ~ "Low", 
+                                       Quality <= 6 ~ "Average",
+                                       Quality >= 7 ~ "High")) %>%
+        select(Rate, var) %>% group_by(Rate) %>% summarize(mean = mean(get(var)), sd = sd(get(var)))
+    } else {
+      sum <- wine %>% select(var) %>% summary() %>% as.data.frame()
+      sum %>% separate(Freq, c("Stat", "Value"), sep=":") %>% pivot_wider(names_from =Stat, values_from = Value) %>% select(-Var1, Variable = Var2)
+    }
+        }) 
   
   # Create plot
   output$plot <- renderPlot({
@@ -149,16 +152,35 @@ server <- function(input, output, session) {
     } else {
       var <- gsub(" ", "", input$variables)
     }
-    g <- ggplot(wine, aes(x = get(var)))
     observe({updateSelectizeInput(session, "plot")})
     
     # Plot based on selection
     if (input$plot == "Bar plot"){
-      g + geom_bar(aes(fill = as.factor(Quality))) + scale_fill_discrete(name = "Quality") + 
+      if (input$rate){
+        sub <- wine %>% mutate(Rate = case_when(Quality <= 4 ~ "Low", 
+                                                Quality <= 6 ~ "Average",
+                                                Quality >= 7 ~ "High")) %>% select(var, Rate)
+        h <- ggplot(sub, aes(x = get(var)))
+        h + geom_bar(aes(fill = Rate)) + scale_fill_discrete(name = "Rate") + 
         labs(x = input$variables)
+      } else {
+        g <- ggplot(wine, aes(x = get(var)))
+        g + geom_bar(aes(fill = as.factor(Quality))) + scale_fill_discrete(name = "Quality") + 
+          labs(x = input$variables)
+      }
     } else {
+      if (input$rate){
+        sub <- wine %>% mutate(Rate = case_when(Quality <= 4 ~ "Low", 
+                                                Quality <= 6 ~ "Average",
+                                                Quality >= 7 ~ "High")) %>% select(var, Rate)
+        h <- ggplot(sub, aes(x = get(var)))
+        h + geom_boxplot(aes(fill = Rate)) + scale_fill_discrete(name = "Rate") + 
+          labs(x = input$variables)
+    } else {
+      g <- ggplot(wine, aes(x = get(var)))
       g + geom_boxplot(aes(fill = as.factor(Quality))) + scale_fill_discrete(name = "Quality") + 
         labs(x = input$variables)
+    }
     }
   })
 
