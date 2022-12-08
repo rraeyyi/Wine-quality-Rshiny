@@ -60,7 +60,16 @@ ui <- dashboardPage(
       # Modeling tab content
       tabItem(tabName = "modeling",
               tabsetPanel(type = "tabs",
-                          tabPanel("Modeling Info"),
+                          tabPanel("Modeling Info",
+                                   h4("LASSO:"),
+                                   h5("LASSO stands for Least Absolute Shrinkage and Selection Operator. It is a statistical formula for the regularisation of data models and feature selection."),
+                                   h5("The main advantage of a LASSO regression model is that it has the ability to set the coefficients for features it does not consider interesting to zero. This means that the model does some automatic feature selection to decide which features should be included."),
+                                   h5("When the number of predictors are more than the number of observations, Lasso Regression method gets into trouble. Also, if there are two or more highly collinear variables then Lasso Regression will select one of them randomly which is not a good technique in data interpretation."), br(),
+                                   h4("Random Forest:"), 
+                                   h5("Random Forest approach is an ensemble learning method for classification, regression and other tasks that operates by constructing a multitude of decision trees at training time. For classification tasks, the output of the random forest is the class selected by most trees. For regression tasks, the mean or average prediction of the individual trees is returned"),
+                                   h5("Random forest model can perform both regression and classification tasks. Also, it prevents overfitting by using multiple trees."),
+                                   h5("The main limitation of random forest is that a large number of trees can make the algorithm too slow and ineffective for real-time predictions."), br(),
+                                   h4("Boosted Tree:")),
                           tabPanel("Modeling Fitting",
                                    h4("Select the Predictors:"),
                                    selectInput("predictors","Predictors",
@@ -87,9 +96,10 @@ ui <- dashboardPage(
     
     # Data tab content
     tabItem(tabName = "data",
-            h4("Select the Wine Type:"),
-            selectizeInput("type", "Type", selected = "Red", choices = c("Red", "White")),
-            mainPanel(dataTableOutput("table"))
+            h4("Select Color:"),
+            selectizeInput("color", "Color", 
+                           choice = c("Red", "White")),
+            dataTableOutput("table")
             )
     )
     )
@@ -189,6 +199,7 @@ server <- function(input, output, session) {
     }
     }
   })
+
 
   # Create fit formula
   fit <- reactive({
@@ -294,6 +305,7 @@ server <- function(input, output, session) {
   
   # Output data table  
   output$table <- renderDataTable({
+    wine <- getData()
     datatable(wine)
   })
 }
