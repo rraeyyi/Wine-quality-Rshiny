@@ -36,10 +36,15 @@ ui <- dashboardPage(
       
       # Data Exploration tab content
       tabItem(tabName = "exploration",
+              h4("Select Color:"),
+              selectizeInput("color", "Color", 
+                             choice = c("Red", "White")),
               h4("Select Variable:"),
               selectizeInput("variables", "Variables", 
                              choice = c("Fixed Acidity", "Volatile Acidity", "Citric Acid", "Residual Sugar", "Chlorides", "Free Sulfur Dioxide", "Total Sulfur Dioxide", "Density", "pH", "Sulphates", "Alcohol")), 
               h4("Rate Classification:"),
+              h5("Low represents quality is less than 5."),
+              h5("High represents quality is greater than 6."), 
               checkboxInput("rate", "Rate"),
               h4("Select Summary Type:"),
               radioButtons("summary", label = "",
@@ -56,12 +61,10 @@ ui <- dashboardPage(
       tabItem(tabName = "modeling",
               tabsetPanel(type = "tabs",
                           tabPanel("Modeling Info"),
-                          tabPanel("Modeling Fitting", 
+                          tabPanel("Modeling Fitting",
                                    h4("Select the Predictors:"),
                                    selectInput("predictors","Predictors",
                                                choice = c("FixedAcidity", "VolatileAcidity", "CitricAcid", "ResidualSugar", "Chlorides", "FreeSulfurDioxide", "TotalSulfurDioxide", "Density", "pH", "Sulphates", "Alcohol"), multiple = TRUE),
-                                   h4("Select Number of Cross Validation:"),
-                                   sliderInput("number", "Cross Validation", min = 0, max = 10, value = 5, step =1),
                                    mainPanel(tableOutput("model"))
                                    ),
                           tabPanel("Prediction", h4("Select the Parameters for Variables:"),
@@ -76,8 +79,8 @@ ui <- dashboardPage(
                                    sliderInput("pH", "pH",min = 1, max = 5, value = 2, step = 0.1),
                                    sliderInput("Sulphates", "Sulphates" ,min = 0, max = 2, value = 1, step = 0.1),
                                    sliderInput("Alcohol", "Alcohol", min = 0, max = 15, value = 12, step = 0.1), br(),
-                                   h4('Your Choices:'),
-                                   tableOutput("choices")
+                                   h4("Boosted Tree Model Prediction:"),
+                                   tableOutput("prediction")
                                    )
                           )
               ),
@@ -95,36 +98,40 @@ ui <- dashboardPage(
 
 server <- function(input, output, session) {
   
+  # Read in data
+  getData <- reactive({
+    red <- read.csv("http://archive.ics.uci.edu/ml/machine-learning-databases/wine-quality/winequality-red.csv", sep = ";")
+    white <- read.csv("http://archive.ics.uci.edu/ml/machine-learning-databases/wine-quality/winequality-white.csv", sep = ";")
+    red["color"] <- "Red"
+    white["color"] <- "White"
+    data <- rbind(red, white) %>% select("FixedAcidity" = "fixed.acidity",
+                                       "VolatileAcidity" = "volatile.acidity",
+                                       "CitricAcid" =  "citric.acid",
+                                       "ResidualSugar" = "residual.sugar",
+                                       "Chlorides" = "chlorides", 
+                                       "FreeSulfurDioxide" = "free.sulfur.dioxide",
+                                       "TotalSulfurDioxide" = "total.sulfur.dioxide",
+                                       "Density" = "density", 
+                                       "pH" = "pH",
+                                       "Sulphates" = "sulphates",
+                                       "Alcohol" = "alcohol",
+                                       "Quality" = "quality",
+                                       "Color" = "color")
+    if (input$color == "Red"){
+      filter(data, data$Color == "Red")
+    } else {
+      filter(data, data$Color == "White")
+    }
+  })
+
   # Output image
   output$img <- renderUI({
     tags$img(src = "https://cdn.analyticsvidhya.com/wp-content/uploads/2021/04/45245download.jpg")
   })
-  
-  # Read in data
-  getData <- reactive({
-    if (input$type == "Red"){
-      wine<-read.csv("http://archive.ics.uci.edu/ml/machine-learning-databases/wine-quality/winequality-red.csv", sep = ";")
-    } else {
-      wine<-read.csv("http://archive.ics.uci.edu/ml/machine-learning-databases/wine-quality/winequality-white.csv", sep = ";")
-    }
-    wine <- wine %>% select("FixedAcidity" = "fixed.acidity",
-                            "VolatileAcidity" = "volatile.acidity",
-                            "CitricAcid" =  "citric.acid",
-                            "ResidualSugar" = "residual.sugar",
-                            "Chlorides" = "chlorides",
-                            "FreeSulfurDioxide" = "free.sulfur.dioxide",
-                            "TotalSulfurDioxide" = "total.sulfur.dioxide",
-                            "Density" = "density",
-                            "pH" = "pH",
-                            "Sulphates" = "sulphates",
-                            "Alcohol" = "alcohol",
-                            "Quality" = "quality")
-    return(wine)
-  })
 
   # Create numeric summary
   output$tab <- renderTable({
-    wine <- getData() 
+    wine <- getData()
     if (str_length(input$variables) <= 10){
       var <- input$variables
     } else {
@@ -138,14 +145,13 @@ server <- function(input, output, session) {
         select(Rate, var) %>% group_by(Rate) %>% summarize(mean = mean(get(var)), sd = sd(get(var)))
     } else {
       sum <- wine %>% select(var) %>% summary() %>% as.data.frame()
-      sum %>% separate(Freq, c("Stat", "Value"), sep=":") %>% pivot_wider(names_from =Stat, values_from = Value) %>% select(-Var1, Variable = Var2)
+      sum %>% separate(Freq, c("Stat", "Value"), sep=":") %>% pivot_wider(names_from = Stat, values_from = Value) %>% select(-Var1, Variable = Var2)
     }
         }) 
   
   # Create plot
   output$plot <- renderPlot({
-    wine <- getData() 
-    
+    wine <- getData()
     # Select variable
     if (str_length(input$variables) <= 10){
       var <- input$variables
@@ -188,19 +194,25 @@ server <- function(input, output, session) {
   fit <- reactive({
     as.formula(paste0("Quality ~ ", paste(input$predictors, collapse = "+")))
   })
-
+  
   # Split data
   splitData <- reactive({
-    set.seed(216)
     wine <- getData()
+    set.seed(216)
     intrain <- createDataPartition(wine$Quality, p = 0.7, list = FALSE)
-    intrain <- splitData()
     training <- wine[intrain,]
     testing <- wine[-intrain,]
-    
-    # Set up cross validation
+    split <- list(training, testing)
+    return(split)
+    })
+  
+  # Fit model
+  model <- reactive({
+    split <- splitData()
+    training <- split[[1]]
+    testing <- split[[2]]
     control <- trainControl(method = "cv", number = 5)
-    
+ 
     # Fit LASSO model
     lasso_model <- train(fit(),
                          data = training,
@@ -214,8 +226,8 @@ server <- function(input, output, session) {
     rf_model <- train(fit(), 
                       data = training, 
                       method = "rf", 
-                      trControl = control, 
                       preProcess = c("center", "scale"), 
+                      trControl = control, 
                       tuneGrid = expand.grid(mtry = 1:((ncol(training) - 1)/3)))
     rf_predict <- predict(rf_model, newdata = testing)
     rf_perform <- postResample(rf_predict, obs = testing$Quality)
@@ -224,17 +236,18 @@ server <- function(input, output, session) {
     gbm_model <- train(fit(),
                        data = training,
                        method = "gbm",
-                       trControl = control,
                        preProcess = c("center", "scale"),
+                       trControl = control,
                        verbose = FALSE)
     gbm_predict <- predict(gbm_model, newdata = testing)
     gbm_perform <- postResample(gbm_predict, obs = testing$Quality)
-  
+    
+    table <- as_tibble(rbind(lasso_perform, rf_perform, gbm_perform))
   })
-
+  
   output$model <- renderTable({
     if(!is.null(input$predictors)){
-      table <- as_tibble(rbind(lasso_perform, rf_perform, gbm_perform))
+      table <- model()
       Model <- c("Lasso", "Random Forest", "Boosted Tree")
       performance <- cbind(Model, table)
       performance
@@ -243,27 +256,45 @@ server <- function(input, output, session) {
     }
   })
   
-
-  # Show choices
-  output$choices <- renderTable({
+  # Output prediction
+  output$prediction <- renderTable({
     choices <- data.frame(FixedAcidity = input$FixedAcidity,
                           VolatileAcidity = input$VolatileAcidity,
                           CitricAcid = input$CitricAcid, 
                           ResidualSugar = input$ResidualSugar,
-                          Chlorides =input$Chlorides,
+                          Chlorides = input$Chlorides,
                           FreeSulfurDioxide = input$FreeSulfurDioxide,
                           TotalSulfurDioxide = input$TotalSulfurDioxide,
                           Density = input$Density, 
                           pH = input$pH,
-                          Sulphates =input$Sulphates,
-                          Alcohol =input$Alcohol
-                          )
-    choices
+                          Sulphates = input$Sulphates,
+                          Alcohol = input$Alcohol)
+    split <- splitData()
+    training <- split[[1]]
+    testing <- split[[2]]
+    control <- trainControl(method = "cv", number = 5)
+    training <- training %>% select(-Color)
+    gbm_model <- train(Quality~.,
+                       data = training,
+                       method = "gbm",
+                       preProcess = c("center", "scale"),
+                       trControl = control,
+                       verbose = FALSE)
+    prediction <- predict(gbm_model, choices)
+    predict <- data.frame("Prediction"= prediction)
+    if (predict <=4) {
+      rate <- data.frame("Rate"= "Low")
+    } else if (predict >=7){
+      rate <- data.frame("Rate"= "High")
+    } else {
+      rate <- data.frame("Rate"= "Average")
+    }
+    cbind(choices, predict, rate)
   })
   
-  # Output table    
+  # Output data table  
   output$table <- renderDataTable({
-    datatable(getData())
+    datatable(wine)
   })
 }
 
