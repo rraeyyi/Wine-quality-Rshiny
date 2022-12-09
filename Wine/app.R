@@ -7,6 +7,25 @@ library(stringr)
 library(caret)
 library(DT)
 
+# Obtain original data
+red <- read.csv("http://archive.ics.uci.edu/ml/machine-learning-databases/wine-quality/winequality-red.csv", sep = ";")
+white <- read.csv("http://archive.ics.uci.edu/ml/machine-learning-databases/wine-quality/winequality-white.csv", sep = ";")
+red["color"] <- "Red"
+white["color"] <- "White"
+data <- rbind(red, white) %>% select("FixedAcidity" = "fixed.acidity",
+                                       "VolatileAcidity" = "volatile.acidity",
+                                       "CitricAcid" =  "citric.acid",
+                                       "ResidualSugar" = "residual.sugar",
+                                       "Chlorides" = "chlorides", 
+                                       "FreeSulfurDioxide" = "free.sulfur.dioxide",
+                                       "TotalSulfurDioxide" = "total.sulfur.dioxide",
+                                       "Density" = "density", 
+                                       "pH" = "pH",
+                                       "Sulphates" = "sulphates",
+                                       "Alcohol" = "alcohol",
+                                       "Quality" = "quality",
+                                       "Color" = "color")
+
 ui <- dashboardPage(
   dashboardHeader(title = "Wine Quality"),
   dashboardSidebar(
@@ -96,37 +115,24 @@ ui <- dashboardPage(
     
     # Data tab content
     tabItem(tabName = "data",
-            h4("Select Color:"),
-            selectizeInput("color", "Color", 
-                           choice = c("Red", "White")),
+            checkboxInput("sub", "Subset data by wine type"),
+            conditionalPanel(condition = "input.sub == 0",
+            dataTableOutput("ogtab")),
+            conditionalPanel(condition = "input.sub == 1",
+                             selectizeInput("type", "Type", 
+                                            choice = c("Red", "White")),
             dataTableOutput("table")
-            )
+            ),
+            downloadButton("downloadData", "Download")
     )
     )
   )
-
+)
 
 server <- function(input, output, session) {
   
-  # Read in data
+  # Subset data by wine type
   getData <- reactive({
-    red <- read.csv("http://archive.ics.uci.edu/ml/machine-learning-databases/wine-quality/winequality-red.csv", sep = ";")
-    white <- read.csv("http://archive.ics.uci.edu/ml/machine-learning-databases/wine-quality/winequality-white.csv", sep = ";")
-    red["color"] <- "Red"
-    white["color"] <- "White"
-    data <- rbind(red, white) %>% select("FixedAcidity" = "fixed.acidity",
-                                       "VolatileAcidity" = "volatile.acidity",
-                                       "CitricAcid" =  "citric.acid",
-                                       "ResidualSugar" = "residual.sugar",
-                                       "Chlorides" = "chlorides", 
-                                       "FreeSulfurDioxide" = "free.sulfur.dioxide",
-                                       "TotalSulfurDioxide" = "total.sulfur.dioxide",
-                                       "Density" = "density", 
-                                       "pH" = "pH",
-                                       "Sulphates" = "sulphates",
-                                       "Alcohol" = "alcohol",
-                                       "Quality" = "quality",
-                                       "Color" = "color")
     if (input$color == "Red"){
       filter(data, data$Color == "Red")
     } else {
@@ -303,11 +309,32 @@ server <- function(input, output, session) {
     cbind(choices, predict, rate)
   })
   
+  # Output original data table
+  output$ogtab <- renderDataTable({
+    datatable(data)
+  })
+  
   # Output data table  
   output$table <- renderDataTable({
-    wine <- getData()
-    datatable(wine)
+    if (input$sub){
+      if (input$type == "Red"){
+        wine <- filter(data, data$Color == "Red")
+      } else {
+        wine <- filter(data, data$Color == "White")
+      }
+      datatable(wine)
+    }
   })
+  
+  # Download as file
+  output$downloadData <- downloadHandler(
+    filename = function() {
+      paste(input$type, "Wine.csv", sep = "")
+    },
+    content = function(file) {
+      write.csv(getData(), file, row.names = FALSE)
+    }
+  )
 }
 
 shinyApp(ui, server)
