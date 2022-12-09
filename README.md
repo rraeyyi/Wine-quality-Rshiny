@@ -22,4 +22,4 @@ library(DT)
 
 + Run the App
 
-shiny::runGitHub(repo = "Final-Project",username = "rraeyyi",ref="main")
+shiny::runGitHub(repo = "Final-Project", username = "rraeyyi", ref="main")
