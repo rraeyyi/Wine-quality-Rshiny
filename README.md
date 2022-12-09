@@ -16,7 +16,8 @@ library(ggplot2)
 library(stringr)  
 library(DT)
 
-+ A line of code that would install all the packages used
++ Install all the packages used
 
-+ The shiny::runGitHub() 
++ Run the App
+
 shiny::runGitHub(repo = "Final-Project",username = "rraeyyi",ref="main")
