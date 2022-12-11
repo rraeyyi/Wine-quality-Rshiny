@@ -9,12 +9,14 @@ Download or learn more about the original data through: [Wine Quality Datasets](
 
 + A list of packages  
 
-library(shiny)  
-library(shinydashboard)  
-library(dplyr)  
-library(ggplot2)  
-library(stringr)  
-library(DT)
+library(shiny) 
+library(shinydashboard) 
+library(dplyr) 
+library(tidyr) 
+library(ggplot2) 
+library(stringr) 
+library(caret) 
+library(DT) 
 
 + A line of code that would install all the packages used
 
