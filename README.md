@@ -20,4 +20,5 @@ library(DT)
 
 + A line of code that would install all the packages used
 
-+ The shiny::runGitHub() 
++ The shiny::runGitHub()  
+shiny::runGitHub(repo = "Final-Project",username = "rraeyyi",ref="main")
