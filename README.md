@@ -7,18 +7,25 @@ The data is from UCI machine learning repository, which includes two datasets re
 
 Download or learn more about the original data through: [Wine Quality Datasets](https://archive.ics.uci.edu/ml/machine-learning-databases/wine-quality/)
 
-+ A list of packages  
++ Packages List 
 
-library(shiny)  
+library(shiny)   
 library(shinydashboard)   
-library(dplyr)  
+library(dplyr)   
 library(tidyr)   
-library(ggplot2)  
-library(stringr)  
-library(caret)  
-library(DT)
+library(ggplot2)   
+library(stringr)   
+library(caret)    
+library(DT)   
 
-+ Install all the packages used
++ Install Packages
+
+packages <- c("shiny", "shinydashboard", "dplyr", "tidyr", "ggplot2", "stringr", "caret", "DT")
+
+installed_packages <- packages %in% rownames(installed.packages())  
+if (any(installed_packages == FALSE)) {  
+  install.packages(packages[!installed_packages])   
+}
 
 + Run the App
 
