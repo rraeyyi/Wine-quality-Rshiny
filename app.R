@@ -98,6 +98,8 @@ ui <- dashboardPage(
                                    ),
                                   
                           tabPanel("Modeling Fitting",
+                                   h4("Select the Proportion:"),
+                                   sliderInput("p", "p", min = 0, max = 1, value = 0.7, step = 0.1),
                                    h4("Select the Predictors:"),
                                    selectInput("predictors","Predictors",
                                                choice = c("FixedAcidity", "VolatileAcidity", "CitricAcid", "ResidualSugar", "Chlorides", "FreeSulfurDioxide", "TotalSulfurDioxide", "Density", "pH", "Sulphates", "Alcohol"), selected = c("pH", "Alcohol"), multiple = TRUE),
@@ -227,7 +229,7 @@ server <- function(input, output, session) {
   splitData <- reactive({
     wine <- getData()
     set.seed(216)
-    intrain <- createDataPartition(wine$Quality, p = 0.7, list = FALSE)
+    intrain <- createDataPartition(wine$Quality, p = input$p, list = FALSE)
     training <- wine[intrain,]
     testing <- wine[-intrain,]
     split <- list(training, testing)
